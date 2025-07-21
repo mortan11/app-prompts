@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4" style="max-width: 600px;">
+    <h2 class="mb-4">{{ 'Editar' if action == 'edit' else 'Crear' }} Prompt</h2>
+    <form method="post">
+        <div class="form-floating mb-3">
+            <input type="text" name="title" class="form-control" id="titleInput"
+                   value="{{ prompt.title if prompt else '' }}" required>
+            <label for="titleInput">Título</label>
+        </div>
+
+        <div class="form-floating mb-3">
+            <input type="text" name="description" class="form-control" id="descInput"
+                   value="{{ prompt.description if prompt else '' }}" required>
+            <label for="descInput">Descripción</label>
+        </div>
+
+        <div class="form-floating mb-3">
+            <textarea name="template" class="form-control" id="templateInput" style="height: 150px" required>{{ prompt.template if prompt else '' }}</textarea>
+            <label for="templateInput">Plantilla</label>
+        </div>
+
+        <div class="form-floating mb-4">
+            <input type="text" name="field_types" class="form-control" id="fieldTypesInput"
+                   value="{{ prompt.field_types | join(',') if prompt and prompt.field_types else '' }}" required>
+            <label for="fieldTypesInput">Tipos de campos (ej: x=number,y=text)</label>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-100">Guardar</button>
+    </form>
+</div>
+{% endblock %}

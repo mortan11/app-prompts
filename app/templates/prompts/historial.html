@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4" style="max-width: 900px;" style="display: list-item;">
+    <h2 class="mb-4 text-center">Historial de interacciones
+        <a href="/historial/export/csv" class="btn btn-sm btn-outline-primary">📁 Exportar CSV</a>
+    </h2>
+    {% if historial %}
+    <div class="list-group shadow-sm">
+        {% for h in historial %}
+        <div class="list-group-item mb-3 border rounded-3 p-3">
+            <h5 class="mb-1 text-primary">{{ h.prompt.title }}</h5>
+            <p class="mb-2"><strong>Entrada:</strong>
+                {% for k, v in h.input_data.items() %}
+                <span class="badge bg-light text-dark me-1">{{ k }}: {{ v }}</span>
+                {% endfor %}
+            </p>
+            <p class="mb-2"><strong>Respuesta:</strong> {{ h.result }}</p>
+
+
+            <div class="d-flex justify-content-between align-items-center">
+                <small class="text-muted">{{ h.timestamp.strftime('%d/%m/%Y %H:%M') }}</small>
+
+                {% if h.rating %}
+                <div class="text-warning">
+                    {% for i in range(1, 6) %}
+                    {% if i <= h.rating %} ★ {% else %} ☆ {% endif %} {% endfor %} </div>
+                        {% else %}
+                        <span class="text-muted fst-italic">Sin valorar</span>
+                        {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info text-center">
+            Aún no has generado ninguna interacción.
+        </div>
+        {% endif %}
+    </div>
+    {% endblock %}

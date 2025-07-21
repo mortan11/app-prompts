@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container d-flex justify-content-center align-items-center py-4">
+  <div class="card shadow-sm p-4" style="max-width: 700px; width: 100%;">
+    <h2 class="card-title mb-4 text-center">Usar plantilla: <span class="text-primary">{{ prompt.title }}</span></h2>
+
+    {% if errores %}
+        <div class="alert alert-danger">
+            <ul class="mb-0">
+                {% for error in errores %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+    <form method="post">
+        {% for campo in campos %}
+            {% set tipo = prompt.field_types.get(campo, 'text') %}
+            {% if tipo == 'checkbox' %}
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="checkbox" name="{{ campo }}" id="{{ campo }}"
+                        {% if valores and campo in valores %}checked{% endif %}>
+                    <label class="form-check-label" for="{{ campo }}">
+                        {{ campo | capitalize }}
+                    </label>
+                </div>
+            {% else %}
+                <div class="form-floating mb-3">
+                    <input type="{{ tipo }}" name="{{ campo }}" id="{{ campo }}" class="form-control"
+                        value="{{ valores[campo] if valores and campo in valores else '' }}" required>
+                    <label for="{{ campo }}">{{ campo | capitalize }}</label>
+                </div>
+            {% endif %}
+        {% endfor %}
+
+        <button class="btn btn-primary w-100">Generar respuesta</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
