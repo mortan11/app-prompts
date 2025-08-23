@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4" style="max-width: 900px;">
+  <form method="post" action="/historial/delete" id="deleteForm" onsubmit="return confirm('¿Estás seguro de eliminar las interacciones seleccionadas?')">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2 class="mb-0">Historial de interacciones</h2>
+      <div>
+        <a href="/historial/export/csv" class="btn btn-sm btn-outline-primary me-2">Exportar CSV</a>
+        <button type="submit" id="deleteButton" class="btn btn-sm btn-danger d-none">Eliminar seleccionadas</button>
+      </div>
+    </div>
+
+    {% if historial %}
+    <div class="list-group shadow-sm">
+      {% for h in historial %}
+      <div class="list-group-item mb-3 border rounded-3 p-3 position-relative">
+        <!-- Checkbox en esquina superior derecha para eliminar -->
+        <div class="position-absolute top-0 end-0 m-2">
+          <input class="form-check-input interaction-checkbox" type="checkbox" name="delete_ids" value="{{ h.id }}" id="check-{{ h.id }}">
+        </div>
+
+        <h5 class="mb-1 text-primary">{{ h.prompt.title }}</h5>
+
+        <p class="mb-2"><strong>Entrada:</strong>
+          {% for k, v in h.input_data.items() %}
+            <span class="badge bg-light text-dark me-1">{{ k }}: {{ v }}</span>
+          {% endfor %}
+        </p>
+
+        <p class="mb-2"><strong>Respuesta:</strong> {{ h.result }}</p>
+
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <small class="text-muted">{{ (h.timestamp + offset).strftime('%d/%m/%Y %H:%M') }}</small>
+
+          <div class="d-flex align-items-center gap-3">
+            <!-- Botón guardar a la IZQUIERDA de las estrellas -->
+            <button type="button"
+                    class="btn btn-sm btn-outline-success save-rating"
+                    data-iid="{{ h.id }}"
+                    title="Guardar puntuación">
+              Guardar
+            </button>
+
+            <!-- Estrellas interactivas -->
+            <div class="rating-inline" data-iid="{{ h.id }}">
+              {% set current = h.rating or 0 %}
+              {% for i in range(5, 0, -1) %}
+                <input type="radio" id="r{{h.id}}-{{i}}" name="rating-{{h.id}}" value="{{ i }}" {% if i == current %}checked{% endif %}>
+                <label for="r{{h.id}}-{{i}}" title="{{ i }} estrellas">★</label>
+              {% endfor %}
+            </div>
+
+            <!-- Texto de estado -->
+            <span class="text-muted small" id="status-{{ h.id }}">
+              {% if h.rating %}Puntuación actual: {{ h.rating }} / 5{% else %}Sin valorar{% endif %}
+            </span>
+
+            <span class="ms-2 text-success small d-none" id="saved-{{ h.id }}">Guardado</span>
+            <span class="ms-2 text-danger small d-none" id="error-{{ h.id }}">Error</span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info text-center">
+      Aún no has generado ninguna interacción.
+    </div>
+    {% endif %}
+  </form>
+</div>
+
+<style>
+  /* Estrellas pequeñas inline */
+  .rating-inline {
+    direction: rtl;
+    unicode-bidi: bidi-override;
+    font-size: 1.4rem;
+    line-height: 1;
+  }
+  .rating-inline input[type="radio"] { display: none; }
+  .rating-inline label {
+    color: #c7c7c7;
+    cursor: pointer;
+    margin: 0 .1rem;
+  }
+  .rating-inline input[type="radio"]:checked ~ label,
+  .rating-inline label:hover,
+  .rating-inline label:hover ~ label {
+    color: #ffc107;
+  }
+</style>
+
+<script>
+  // Mostrar/ocultar botón "Eliminar seleccionadas"
+  const checkboxes = document.querySelectorAll('.interaction-checkbox');
+  const deleteButton = document.getElementById('deleteButton');
+
+  function updateDeleteButtonVisibility() {
+    const anyChecked = Array.from(checkboxes).some(cb => cb.checked);
+    deleteButton.classList.toggle('d-none', !anyChecked);
+  }
+  checkboxes.forEach(cb => cb.addEventListener('change', updateDeleteButtonVisibility));
+  updateDeleteButtonVisibility();
+
+  // Guardar rating inline por interacción (AJAX)
+  document.querySelectorAll('.save-rating').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const iid = btn.dataset.iid;
+      const selected = document.querySelector(`input[name="rating-${iid}"]:checked`);
+      const msgOk = document.getElementById(`saved-${iid}`);
+      const msgErr = document.getElementById(`error-${iid}`);
+      const status = document.getElementById(`status-${iid}`);
+
+      msgOk && msgOk.classList.add('d-none');
+      msgErr && msgErr.classList.add('d-none');
+
+      if (!selected) {
+        msgErr && (msgErr.textContent = 'Elige una puntuación');
+        msgErr && msgErr.classList.remove('d-none');
+        return;
+      }
+
+      const fd = new FormData();
+      fd.append('rating', selected.value);
+
+      try {
+        const res = await fetch(`/historial/rate/${iid}`, { method: 'POST', body: fd });
+        const data = await res.json();
+
+        if (!res.ok || !data.ok) throw new Error(data.error || 'Error');
+
+        // Feedback & actualizar texto de estado
+        status && (status.textContent = `Puntuación actual: ${data.rating} / 5`);
+        msgOk && msgOk.classList.remove('d-none');
+        setTimeout(() => msgOk && msgOk.classList.add('d-none'), 1500);
+      } catch (e) {
+        msgErr && (msgErr.textContent = 'Error al guardar');
+        msgErr && msgErr.classList.remove('d-none');
+      }
+    });
+  });
+</script>
+{% endblock %}

@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container py-4" style="max-width: 700px;">
+  <h2 class="mb-4">{{ 'Editar' if action == 'edit' else 'Crear' }} Prompt</h2>
+
+  <form method="post" id="promptForm">
+    <!-- Título -->
+    <div class="form-floating mb-3">
+      <input type="text" name="title" class="form-control" id="titleInput"
+             value="{{ prompt.title if prompt else '' }}" required>
+      <label for="titleInput">Título</label>
+    </div>
+
+    <!-- Descripción -->
+    <div class="form-floating mb-3">
+      <input type="text" name="description" class="form-control" id="descInput"
+             value="{{ prompt.description if prompt else '' }}" required>
+      <label for="descInput">Descripción</label>
+    </div>
+
+    <!-- Plantilla -->
+    <div class="form-floating mb-3">
+      <textarea name="template" class="form-control" id="templateInput" style="height: 150px" required>{{ prompt.template if prompt else '' }}</textarea>
+      <label for="templateInput">Plantilla (usa {{'{{campo}}'}} para variables)</label>
+    </div>
+
+    <!-- Campos detectados + tipo -->
+    <div class="card mb-4">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <h5 class="card-title mb-0">Campos detectados</h5>
+          <small class="text-muted">Se actualiza al editar la plantilla</small>
+        </div>
+        <div id="fieldsContainer">
+          <div class="alert alert-info m-0">No se han detectado campos todavía.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hidden que enviamos al backend con el formato k=v,k=v -->
+    <input type="hidden" name="field_types" id="fieldTypesInputHidden" value="">
+
+    <!-- Inicial: tipos existentes (sólo en editar) en formato k=v,k=v -->
+    <input type="hidden" id="initialFieldTypes" value="{% if prompt and prompt.field_types %}{% for k,v in prompt.field_types.items() %}{{k}}={{v}}{{ ',' if not loop.last }}{% endfor %}{% endif %}">
+
+    <button type="submit" class="btn btn-primary w-100">Guardar</button>
+  </form>
+</div>
+
+<script>
+  (function () {
+    // Tipos soportados por tu app
+    const TYPE_OPTIONS = ["text", "number", "checkbox", "date"];
+
+    const templateEl = document.getElementById("templateInput");
+    const fieldsContainer = document.getElementById("fieldsContainer");
+    const hiddenFieldTypes = document.getElementById("fieldTypesInputHidden");
+    const initialString = (document.getElementById("initialFieldTypes")?.value || "").trim();
+
+    // Parse "k=v,k=v" -> {k: v, ...}
+    function parseKVString(str) {
+      const out = {};
+      if (!str) return out;
+      str.split(",").forEach(pair => {
+        const [k, v] = pair.split("=").map(s => (s || "").trim());
+        if (k) out[k] = v || "text";
+      });
+      return out;
+    }
+
+    // Extrae {{campo}} únicos en orden de aparición
+    function extractFields(tpl) {
+      const re = /\{\{\s*([^\{\}\s]+)\s*\}\}/g;
+      const seen = new Set();
+      const result = [];
+      let m;
+      while ((m = re.exec(tpl)) !== null) {
+        const name = m[1].trim();
+        if (!seen.has(name)) {
+          seen.add(name);
+          result.push(name);
+        }
+      }
+      return result;
+    }
+
+    // Renderiza filas con <select> para cada campo
+    function renderFields(fields, existingTypes) {
+      if (!fields.length) {
+        fieldsContainer.innerHTML = '<div class="alert alert-info m-0">No se han detectado campos todavía.</div>';
+        return;
+      }
+
+      const rows = fields.map(name => {
+        const current = existingTypes[name] || "text";
+        const options = TYPE_OPTIONS.map(t =>
+          `<option value="${t}" ${t === current ? "selected" : ""}>${t}</option>`
+        ).join("");
+
+        return `
+          <div class="row g-2 align-items-center mb-2">
+            <div class="col-6 col-md-6">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">Campo</span>
+                <input type="text" class="form-control" value="${name}" readonly>
+              </div>
+            </div>
+            <div class="col-6 col-md-6">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text">Tipo</span>
+                <select class="form-select field-type-select" data-field="${name}">
+                  ${options}
+                </select>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      fieldsContainer.innerHTML = rows;
+    }
+
+    // Construye "k=v,k=v" a partir de los selects
+    function buildFieldTypesKV() {
+      const selects = fieldsContainer.querySelectorAll(".field-type-select");
+      const pairs = [];
+      selects.forEach(sel => {
+        const field = sel.getAttribute("data-field");
+        const type = sel.value || "text";
+        pairs.push(`${field}=${type}`);
+      });
+      return pairs.join(",");
+    }
+
+    // Estado inicial
+    const existingTypes = parseKVString(initialString);
+
+    function refreshUI() {
+      const fields = extractFields(templateEl.value || "");
+      renderFields(fields, existingTypes);
+      // Al renderizar, actualizamos el hidden
+      hiddenFieldTypes.value = buildFieldTypesKV();
+    }
+
+    // Actualiza al escribir en la plantilla
+    let debounceTimer = null;
+    templateEl.addEventListener("input", () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(refreshUI, 150);
+    });
+
+    // Actualiza el hidden cuando cambian selects
+    fieldsContainer.addEventListener("change", (e) => {
+      if (e.target && e.target.classList.contains("field-type-select")) {
+        hiddenFieldTypes.value = buildFieldTypesKV();
+      }
+    });
+
+    // Asegura que antes de enviar está sincronizado
+    document.getElementById("promptForm").addEventListener("submit", () => {
+      hiddenFieldTypes.value = buildFieldTypesKV();
+    });
+
+    // Primer render (incluye precarga de tipos en editar)
+    refreshUI();
+  })();
+</script>
+{% endblock %}
